@@ -1,5 +1,5 @@
 /** Ports the core depends on. Sources, policies, assessors, executors, and channels are project-specific. */
-import type { Assignment, ChannelRef, Decision, DecisionKind, Mandate, MandateBasis, Strength, Thread, Ticket, TicketEndBy, TicketOutcome, Trigger }
+import type { Assignment, ActorRef, ChannelRef, Decision, DecisionKind, Mandate, MandateBasis, Strength, Thread, Ticket, TicketEndBy, TicketOutcome, Trigger }
   from './model.ts'
 import type { Reason } from './reasons.ts'
 
@@ -18,8 +18,8 @@ export interface Policy {
   version: string
   paused: boolean
   gate(trigger: Trigger, thread: Thread, tickets: Ticket[]): GateResult
-  /** Re-check a mandate's gate-layer basis under this policy, such as before an ended ticket resumes. */
-  revalidate(mandate: Mandate): boolean
+  /** Re-check a mandate's gate-layer basis under this policy, such as before an ended ticket resumes. When the resuming trigger's actor is given, an explicit follow-up mandate also requires that actor to still be allowed. */
+  revalidate(mandate: Mandate, resumingActor?: ActorRef): boolean
   /** Whether an inferred candidate may be accepted on the rules its assessment matched: assessments accept, and each rule is enabled. */
   admitsInferred(rules: readonly string[]): boolean
   /** How long an assessor may take before an eval is recorded as unavailable. */

@@ -210,7 +210,7 @@ export function settingsPolicy(settings: Settings, sources: SourceScope): Policy
       return { admissible: false, reason: !allowed ? 'not_a_member' : receivable && admission === 'ignore' ? 'admission_ignored' : 'no_mention' }
     },
     admitsInferred: rules => mode === 'auto' && rules.length > 0 && rules.every(id => settings.policy.rules.some(rule => rule.enabled && rule.id === id)),
-    revalidate(mandate: Mandate) {
+    revalidate(mandate: Mandate, resumingActor?: ActorRef) {
       // Revalidation rules follow docs/002 (Eval path; Resume revalidates).
       const { basis } = mandate
       const { source } = basis
@@ -218,7 +218,12 @@ export function settingsPolicy(settings: Settings, sources: SourceScope): Policy
       if (current && !current.listened) return false
       const rulesOn = (rules: string[] | undefined) => (rules ?? []).every(id => settings.policy.rules.some(rule => rule.enabled && rule.id === id))
       // Explicit follow-ups remain valid; inferred follow-ups require auto mode and enabled matched rules.
-      if (basis.via === 'followup') return mandate.strength === 'explicit' || (mode === 'auto' && rulesOn(basis.rules))
+      // An explicit follow-up resumed by a new sender requires that sender to still be allowed: without this,
+      // anyone who can comment could resume a ticket whose original requester was removed from the list.
+      if (basis.via === 'followup') {
+        if (mandate.strength === 'explicit' && resumingActor && !allowedSender(settings, resumingActor)) return false
+        return mandate.strength === 'explicit' || (mode === 'auto' && rulesOn(basis.rules))
+      }
       // A bot's candidate holds only while the bot remains on its Source's bot list and passes the observation checks below.
       if (basis.via === 'bot' && !listedBot(settings, mandate.actor)) return false
       // An admission-table Mandate holds while the sender's current cell still grants at least the original strength.

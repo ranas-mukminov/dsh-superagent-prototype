@@ -246,7 +246,8 @@ export class Tickets extends EnginePart {
   /**
    * Resume an ended ticket under its unchanged Mandate when a person's message on one of its Threads waits for it: no Eval
    * and no Decision, since nothing new is authorized. One whose Mandate the current Policy no longer holds stays ended and
-   * takes nothing (see `refuse`). While processing is paused the message waits, and the first pass after the pause resumes
+   * takes nothing (see `refuse`). An explicit follow-up Mandate additionally requires the resuming sender to still be
+   * allowed, so a removed sender's ticket cannot be resumed by any other commenter. While processing is paused the message waits, and the first pass after the pause resumes
    * the ticket under the Policy then. Reads the ticket afresh, so it is idempotent and leaves an already-resumed ticket alone.
    */
   wake(ticketId: string): void {
@@ -254,10 +255,11 @@ export class Tickets extends EnginePart {
     if (!ticket || liveTicket(ticket) || ticket.ended?.by === 'human' || !ticket.undelivered.length) return
     const policy = this.policy()
     if (policy.paused) return
-    if (!policy.revalidate(ticket.mandate)) { this.refuse(ticket); return }
     // Only a human's message resumes an ended ticket; bot/CI triggers wait alongside inputs from before the ticket ended.
     const first = ticket.undelivered.map(id => ticket.inputs.find(input => input.id === id)).find(input => input?.kind === 'trigger' && input.human)
     if (first?.kind !== 'trigger') return
+    const resuming = this.repo.triggers.get(first.triggerId)
+    if (!policy.revalidate(ticket.mandate, resuming?.actor)) { this.refuse(ticket); return }
     const at = this.now()
     delete ticket.ended; ticket.updatedAt = at
     const assignment = this.newAssignment(ticket)

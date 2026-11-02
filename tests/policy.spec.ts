@@ -221,6 +221,16 @@ describe('revalidate and version', () => {
     expect(setup({ ...base, policy: { ...base.policy, rules: base.policy.rules.map(rule => ({ ...rule, enabled: rule.id !== 'copy' })) } }).policy.revalidate(inferred)).toBe(false)
     expect(setup(nobody).policy.revalidate({ ...mandate, basis: { via: 'followup' } })).toBe(true)
   })
+  it('refuses an explicit follow-up resume from a sender no longer on the allowed list', () => {
+    const basis: MandateBasis = { via: 'followup', source: 'github', scope: { number: 1, isPr: true } }
+    const mandate = { strength: 'explicit' as const, policyVersion: 'v', basis, actor: { source: 'github', id: 'Alice' }, scope: '' }
+    // No resuming actor given: the old no-actor check still passes, so other revalidate callers are unchanged.
+    expect(policy.revalidate(mandate)).toBe(true)
+    expect(policy.revalidate(mandate, { source: 'github', id: 'alice' })).toBe(true)
+    expect(policy.revalidate(mandate, { source: 'github', id: 'mallory' })).toBe(false)
+    const nobody = { ...base, policy: { ...base.policy, sources: {} } }
+    expect(setup(nobody).policy.revalidate(mandate, { source: 'github', id: 'alice' })).toBe(false)
+  })
   it('changes the Policy version for rules, accept mode and the Sources\' parts, not for pause, concurrency, models or Source configuration', () => {
     const version = setup().version
     expect(setup({ ...base, paused: true, executor: { ...base.executor, maxWorkers: 9 }, eval: { ...base.eval, timeoutSeconds: 300 }, sources: { ...base.sources, github: { enabled: true, config: { pollSeconds: 600 } } } }).version).toBe(version)
